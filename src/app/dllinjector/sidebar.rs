@@ -13,7 +13,7 @@ impl Sidebar<'_> {
             panel: SidePanel::left("left sidepanel")
         }
     }
-    pub fn show(mut self) -> () {
+    pub fn show(self) -> () {
         self.panel
         .frame(Frame::default().fill(Color32::LIGHT_BLUE))
         .show(self.context, |ui| {

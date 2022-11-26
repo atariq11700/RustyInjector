@@ -22,7 +22,7 @@ impl ProcessesList<'_> {
             panel: CentralPanel::default()
         }
     }
-    pub fn show(mut self) -> () {
+    pub fn show(self) -> () {
         self.panel
         .frame(Frame::default().fill(Color32::LIGHT_GREEN))
         .show(self.context, |ui| {
@@ -46,18 +46,28 @@ fn get_processes() -> Option<Vec<PROCESSENTRY32>> {
     unsafe {    
         let proc_snap: HANDLE = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, NULL as DWORD);
 
-        if (Process32First(proc_snap, &mut proc_entry) == 0) {
-            CloseHandle(proc_snap);
-            return None;
+        match Process32First(proc_snap, &mut proc_entry) {
+            0 => {
+                CloseHandle(proc_snap); 
+                return None;
+            },
+            _ => {
+                procs.push(proc_entry);
+            }
         }
 
-        procs.push(proc_entry);
-
-        while (Process32Next(proc_snap, &mut proc_entry) != 0) {
-            procs.push(proc_entry);
+        loop {
+            match Process32Next(proc_snap, &mut proc_entry) {
+                0 => {
+                    CloseHandle(proc_snap); 
+                    break;
+                }
+                _ => {
+                    procs.push(proc_entry);
+                }
+            }
         }
 
-        CloseHandle(proc_snap);
         
     };
 
@@ -67,18 +77,18 @@ fn get_processes() -> Option<Vec<PROCESSENTRY32>> {
 
 fn render_processes(ui: &mut Ui, procs: Vec<PROCESSENTRY32>) {
     for proc in procs {
-        ui.label(format!("[{}] - {}", proc.th32ProcessID, szExeToString(proc.szExeFile)));
+        ui.label(format!("[{:>12}] - {:<30}", proc.th32ProcessID, sz_exe_to_string(proc.szExeFile)));
     }
 }
 
-fn szExeToString(arr: [CHAR; MAX_PATH]) -> String {
+fn sz_exe_to_string(arr: [CHAR; MAX_PATH]) -> String {
     let mut byte_vec: Vec<u8> = Vec::new();
     for byte in arr {
-        if (byte == 0) {
+        if byte == 0 {
             break
         }
         byte_vec.push(byte as u8)
     }
-    return String::from_utf8(byte_vec).unwrap();
+    return String::from_utf8(byte_vec).unwrap_or("Error Getting Process Name".to_string());
 }
 
