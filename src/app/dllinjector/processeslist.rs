@@ -74,7 +74,7 @@ fn render_processes(ui: &mut Ui, procs: Vec<PROCESSENTRY32>) {
     }
 }
 
-fn sz_exe_to_string(arr: [CHAR; MAX_PATH]) -> String {
+pub fn sz_exe_to_string(arr: [CHAR; MAX_PATH]) -> String {
     let mut byte_vec: Vec<u8> = Vec::new();
     for byte in arr {
         if byte == 0 {

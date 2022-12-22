@@ -1,4 +1,7 @@
 use egui::{SidePanel, Frame, Color32, Context, ComboBox, Widget, WidgetText};
+use winapi::um::tlhelp32::PROCESSENTRY32;
+
+use super::processeslist::sz_exe_to_string;
 
 
 
@@ -8,13 +11,15 @@ pub struct Sidebar {
 }
 
 struct State {
-    injection_type: InjectionTypes
+    injection_type: InjectionTypes,
+    selected_process: Option<PROCESSENTRY32>
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 enum InjectionTypes {
     Native,
     ManualMap,
+    Kernel,
 }
 
 impl InjectionTypes {
@@ -22,6 +27,8 @@ impl InjectionTypes {
         match self {
             InjectionTypes::Native => "Native",
             InjectionTypes::ManualMap => "Manual Map",
+            InjectionTypes::Kernel => "Kernel"
+
         }
     }
 }
@@ -30,7 +37,8 @@ impl Sidebar {
     pub fn new() -> Sidebar {
         return Sidebar { 
             state: State { 
-                injection_type: InjectionTypes::Native
+                injection_type: InjectionTypes::Native,
+                selected_process: None
             }
         }
     }
@@ -39,7 +47,11 @@ impl Sidebar {
             .frame(Frame::default()
                 .fill(Color32::LIGHT_BLUE))
             .show(ctx, |ui| {
-                ui.label("sidebar");
+                ui.label("Injection Options");
+                ui.label(match self.state.selected_process {
+                    Some(proc) => sz_exe_to_string(proc.szExeFile),
+                    None => "No Process Selected".to_string()
+                });
                 ComboBox::from_label("Select Inection Type")
                     .selected_text(&*self.state.injection_type.to_string())
                     .show_ui(ui, |ui| {
