@@ -1,23 +1,27 @@
 use egui::{SidePanel, Frame, Color32, Context};
 
 
-pub struct Sidebar<'a> {
-    context: &'a Context,
-    panel: SidePanel
+
+
+pub struct Sidebar {
+    state: State,
 }
 
-impl Sidebar<'_> {
-    pub fn new<'a>(context: &'a Context) -> Sidebar<'a> {
-        return Sidebar {
-            context: context,
-            panel: SidePanel::left("left sidepanel")
+struct State {
+
+}
+
+impl Sidebar {
+    pub fn new() -> Sidebar {
+        return Sidebar { 
+            state: State {}
         }
     }
-    pub fn show(self) -> () {
-        self.panel
-        .frame(Frame::default().fill(Color32::LIGHT_BLUE))
-        .show(self.context, |ui| {
-            ui.label("sidebar");
-        });
+    pub fn show(&self, ctx: &egui::Context) -> () {
+        SidePanel::left("Left SidePanel")
+            .frame(Frame::default().fill(Color32::LIGHT_BLUE))
+            .show(ctx, |ui| {
+                ui.label("sidebar")
+            });
     }
 }

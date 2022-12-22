@@ -10,31 +10,24 @@ use winapi::{
     }
 };
 
-pub struct ProcessesList<'a> {
-    context: &'a Context,
-    panel: CentralPanel
-}
+pub struct ProcessesList { }
 
-impl ProcessesList<'_> {
-    pub fn new<'a>(context: &'a Context) -> ProcessesList<'a> {
-        return ProcessesList {
-            context: context,
-            panel: CentralPanel::default()
-        }
-    }
-    pub fn show(self) -> () {
-        self.panel
-        .frame(Frame::default().fill(Color32::LIGHT_GREEN))
-        .show(self.context, |ui| {
-            ScrollArea::vertical()
-            .show(ui, |ui| {
-                let procs = get_processes();
-                match procs {
-                    Some(procs) => render_processes(ui, procs),
-                    None => println!("Unable to get list of processes")
-                }
-            })
-        });
+
+impl ProcessesList {
+    pub fn show(&self, ctx: &egui::Context) {
+        CentralPanel::default()
+            .frame(Frame::default()
+                .fill(Color32::LIGHT_GREEN))
+            .show(ctx, |ui| {
+                ScrollArea::vertical()
+                    .show(ui, |ui| {
+                        let procs = get_processes();
+                        match procs {
+                            Some(procs) => render_processes(ui, procs),
+                            None => println!("Unable to get list of processes")
+                        }
+                    })
+            });
     }
 }
 

@@ -7,17 +7,23 @@ use sidebar::Sidebar;
 use processeslist::ProcessesList;
 
 
-pub struct DllInejctorApp;
+pub struct DllInejctorApp {
+    sidebar: Sidebar,
+    process_list: ProcessesList,
+}
 
 impl DllInejctorApp {
     pub fn new(_creation_contex: &CreationContext) -> DllInejctorApp {
-        return DllInejctorApp;
+        return DllInejctorApp {
+            sidebar: Sidebar::new(),
+            process_list: ProcessesList {}
+        }
     }
 }
 
 impl eframe::App for DllInejctorApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        Sidebar::new(ctx).show();
-        ProcessesList::new(ctx).show();
+        self.sidebar.show(ctx);
+        self.process_list.show(ctx);
     }
 }
