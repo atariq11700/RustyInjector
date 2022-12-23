@@ -1,7 +1,7 @@
 use egui::{SidePanel, Frame, Color32, Context, ComboBox, Widget, WidgetText};
 use winapi::um::tlhelp32::PROCESSENTRY32;
 
-use super::processeslist::sz_exe_to_string;
+use super::{processeslist::sz_exe_to_string, DllInejctorApp};
 
 
 

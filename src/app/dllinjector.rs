@@ -16,7 +16,7 @@ impl DllInejctorApp {
     pub fn new(_creation_contex: &CreationContext) -> DllInejctorApp {
         return DllInejctorApp {
             sidebar: Sidebar::new(),
-            process_list: ProcessesList {}
+            process_list: ProcessesList::new()
         }
     }
 }

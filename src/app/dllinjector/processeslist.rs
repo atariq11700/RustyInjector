@@ -1,4 +1,4 @@
-use egui::{CentralPanel,Frame, Color32, Context, ScrollArea, Ui};
+use egui::{CentralPanel,Frame, Color32, Context, ScrollArea, Ui, RichText};
 use winapi::{
     um::{
         tlhelp32::{PROCESSENTRY32, CreateToolhelp32Snapshot, TH32CS_SNAPPROCESS, Process32First, Process32Next}, 
@@ -10,11 +10,19 @@ use winapi::{
     }
 };
 
-pub struct ProcessesList { }
 
+pub struct ProcessesList {
+    selected_proc: Option<PROCESSENTRY32>    
+}
 
 impl ProcessesList {
-    pub fn show(&self, ctx: &egui::Context) {
+    pub fn new() -> ProcessesList {
+        return ProcessesList { 
+            selected_proc: None
+        }
+    }
+
+    pub fn show(&mut self, ctx: &egui::Context) {
         CentralPanel::default()
             .frame(Frame::default()
                 .fill(Color32::LIGHT_GREEN))
@@ -23,12 +31,33 @@ impl ProcessesList {
                     .show(ui, |ui| {
                         let procs = get_processes();
                         match procs {
-                            Some(procs) => render_processes(ui, procs),
+                            Some(procs) => self.render_processes(ui, procs),
                             None => println!("Unable to get list of processes")
                         }
                     })
             });
     }
+
+    fn render_processes(&mut self, ui: &mut Ui, procs: Vec<PROCESSENTRY32>) {
+        for proc in procs {
+            let button_text = format!("[{:>12}] - {:<30}", proc.th32ProcessID, sz_exe_to_string(proc.szExeFile));
+            let button_color = match self.selected_proc {
+                Some(sproc) => match sproc.th32ProcessID == proc.th32ProcessID {
+                    true => Color32::RED,
+                    false => Color32::BLUE,
+                },
+                None => Color32::BLUE,
+            };
+            let button = ui.button(RichText::new(button_text).color(button_color));
+    
+            if button.clicked() {
+                let name = sz_exe_to_string(proc.szExeFile);
+                println!("Button Clicked {name}");
+                self.selected_proc = Some(proc);
+            }
+        }
+    }
+    
 }
 
 fn get_processes() -> Option<Vec<PROCESSENTRY32>> {
@@ -68,11 +97,6 @@ fn get_processes() -> Option<Vec<PROCESSENTRY32>> {
     return Some(procs);
 }
 
-fn render_processes(ui: &mut Ui, procs: Vec<PROCESSENTRY32>) {
-    for proc in procs {
-        ui.label(format!("[{:>12}] - {:<30}", proc.th32ProcessID, sz_exe_to_string(proc.szExeFile)));
-    }
-}
 
 pub fn sz_exe_to_string(arr: [CHAR; MAX_PATH]) -> String {
     let mut byte_vec: Vec<u8> = Vec::new();
