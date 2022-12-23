@@ -1,4 +1,4 @@
-use egui::{CentralPanel, Color32, Context, Frame, RichText, ScrollArea, Ui};
+use egui::{CentralPanel, Color32, Frame, RichText, ScrollArea, Ui};
 use winapi::{
     shared::{
         minwindef::{DWORD, MAX_PATH},
@@ -45,7 +45,7 @@ fn render_processes(ui: &mut Ui, procs: Vec<PROCESSENTRY32>, app_state: &mut App
             sz_exe_to_string(proc.szExeFile)
         );
         let button_color = match app_state.selected_process {
-            Some(sproc) => match sproc.th32ProcessID == proc.th32ProcessID {
+            Some(selected_proc) => match selected_proc.th32ProcessID == proc.th32ProcessID {
                 true => Color32::RED,
                 false => Color32::BLUE,
             },

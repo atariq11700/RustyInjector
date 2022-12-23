@@ -1,10 +1,10 @@
-use egui::{Color32, ComboBox, Context, Frame, SidePanel, Widget, WidgetText};
-use winapi::um::tlhelp32::PROCESSENTRY32;
+use egui::{Color32, ComboBox, Frame, RichText, SidePanel};
 
 use super::{processeslist::sz_exe_to_string, AppState, DllInejctorApp};
 
 pub struct Sidebar {
     injection_type: InjectionTypes,
+    injection_msg: Option<String>,
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
@@ -28,6 +28,7 @@ impl Sidebar {
     pub fn new() -> Sidebar {
         return Sidebar {
             injection_type: InjectionTypes::Native,
+            injection_msg: None,
         };
     }
     pub fn show(&mut self, ctx: &egui::Context, app_state: &mut AppState) -> () {
@@ -55,7 +56,35 @@ impl Sidebar {
                             InjectionTypes::ManualMap,
                             InjectionTypes::ManualMap.to_string(),
                         )
-                    })
+                    });
+                if ui.button("Inject").clicked() {
+                    match app_state.selected_process {
+                        Some(proc) => {
+                            match self.injection_type {
+                                InjectionTypes::Native => {
+                                    ui.label(
+                                        RichText::new("Injecting with native")
+                                            .color(Color32::GREEN),
+                                    );
+                                }
+                                InjectionTypes::ManualMap => {
+                                    ui.label(
+                                        RichText::new("Injecting with mm").color(Color32::GREEN),
+                                    );
+                                }
+                                _ => {
+                                    ui.label(
+                                        RichText::new("Unsupported Injection Type")
+                                            .color(Color32::RED),
+                                    );
+                                }
+                            };
+                        }
+                        _ => {
+                            ui.label(RichText::new("No Process Selected").color(Color32::RED));
+                        }
+                    };
+                };
             });
     }
 }
