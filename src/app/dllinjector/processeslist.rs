@@ -13,52 +13,50 @@ use winapi::{
     },
 };
 
-pub struct ProcessesList {
-    selected_proc: Option<PROCESSENTRY32>,
-}
+use super::AppState;
+
+pub struct ProcessesList {}
 
 impl ProcessesList {
     pub fn new() -> ProcessesList {
-        return ProcessesList {
-            selected_proc: None,
-        };
+        return ProcessesList {};
     }
 
-    pub fn show(&mut self, ctx: &egui::Context) {
+    pub fn show(&mut self, ctx: &egui::Context, app_state: &mut AppState) {
         CentralPanel::default()
             .frame(Frame::default().fill(Color32::LIGHT_GREEN))
             .show(ctx, |ui| {
                 ScrollArea::vertical().show(ui, |ui| {
                     let procs = get_processes();
                     match procs {
-                        Some(procs) => self.render_processes(ui, procs),
+                        Some(procs) => render_processes(ui, procs, app_state),
                         None => println!("Unable to get list of processes"),
                     }
                 })
             });
     }
+}
 
-    fn render_processes(&mut self, ui: &mut Ui, procs: Vec<PROCESSENTRY32>) {
-        for proc in procs {
-            let button_text = format!(
-                "[{:>12}] - {:<30}",
-                proc.th32ProcessID,
-                sz_exe_to_string(proc.szExeFile)
-            );
-            let button_color = match self.selected_proc {
-                Some(sproc) => match sproc.th32ProcessID == proc.th32ProcessID {
-                    true => Color32::RED,
-                    false => Color32::BLUE,
-                },
-                None => Color32::BLUE,
-            };
-            let button = ui.button(RichText::new(button_text).color(button_color));
+fn render_processes(ui: &mut Ui, procs: Vec<PROCESSENTRY32>, app_state: &mut AppState) {
+    for proc in procs {
+        let button_text = format!(
+            "[{:>12}] - {:<30}",
+            proc.th32ProcessID,
+            sz_exe_to_string(proc.szExeFile)
+        );
+        let button_color = match app_state.selected_process {
+            Some(sproc) => match sproc.th32ProcessID == proc.th32ProcessID {
+                true => Color32::RED,
+                false => Color32::BLUE,
+            },
+            None => Color32::BLUE,
+        };
+        let button = ui.button(RichText::new(button_text).color(button_color));
 
-            if button.clicked() {
-                let name = sz_exe_to_string(proc.szExeFile);
-                println!("Button Clicked {name}");
-                self.selected_proc = Some(proc);
-            }
+        if button.clicked() {
+            let name = sz_exe_to_string(proc.szExeFile);
+            println!("Button Clicked {name}");
+            app_state.selected_process = Some(proc);
         }
     }
 }
