@@ -1,10 +1,11 @@
-mod processeslist;
-mod sidebar;
+mod components;
+mod injectionmethods;
+mod utils;
 
+
+use components::processeslist::ProcessesList;
+use components::sidebar::Sidebar;
 use eframe::CreationContext;
-
-use processeslist::ProcessesList;
-use sidebar::Sidebar;
 use winapi::um::tlhelp32::PROCESSENTRY32;
 
 pub struct DllInejctorApp {

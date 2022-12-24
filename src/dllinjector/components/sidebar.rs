@@ -1,10 +1,14 @@
-use egui::{Color32, ComboBox, Frame, RichText, SidePanel};
 
-use super::{processeslist::sz_exe_to_string, AppState, DllInejctorApp};
+
+
+use egui::{Color32, ComboBox, Frame, RichText, SidePanel};
+use crate::{dllinjector::components::processeslist::sz_exe_to_string, dllinjector::AppState};
+
 
 pub struct Sidebar {
     injection_type: InjectionTypes,
-    injection_msg: Option<String>,
+    injection_msg: Option<RichText>,
+    dll_path: Option<String>
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
@@ -29,6 +33,7 @@ impl Sidebar {
         return Sidebar {
             injection_type: InjectionTypes::Native,
             injection_msg: None,
+            dll_path: None
         };
     }
     pub fn show(&mut self, ctx: &egui::Context, app_state: &mut AppState) -> () {
@@ -58,33 +63,23 @@ impl Sidebar {
                         )
                     });
                 if ui.button("Inject").clicked() {
-                    match app_state.selected_process {
-                        Some(proc) => {
-                            match self.injection_type {
-                                InjectionTypes::Native => {
-                                    ui.label(
-                                        RichText::new("Injecting with native")
-                                            .color(Color32::GREEN),
-                                    );
-                                }
-                                InjectionTypes::ManualMap => {
-                                    ui.label(
-                                        RichText::new("Injecting with mm").color(Color32::GREEN),
-                                    );
-                                }
-                                _ => {
-                                    ui.label(
-                                        RichText::new("Unsupported Injection Type")
-                                            .color(Color32::RED),
-                                    );
-                                }
-                            };
-                        }
-                        _ => {
-                            ui.label(RichText::new("No Process Selected").color(Color32::RED));
-                        }
+                    self.injection_msg = match app_state.selected_process {
+                        Some(proc) => match self.injection_type {
+                            InjectionTypes::Native => {
+                                Some(RichText::new("Injecting with native").color(Color32::GREEN))
+                            }
+                            InjectionTypes::ManualMap => {
+                                Some(RichText::new("Injecting with mm").color(Color32::GREEN))
+                            }
+                            _ => Some(RichText::new("Unknown Injection Type").color(Color32::RED)),
+                        },
+                        _ => Some(RichText::new("No Selected Process").color(Color32::RED)),
                     };
                 };
+
+                if !self.injection_msg.is_none() {
+                    ui.label(self.injection_msg.as_ref().unwrap().clone());
+                }
             });
     }
 }

@@ -13,7 +13,7 @@ use winapi::{
     },
 };
 
-use super::AppState;
+use crate::dllinjector::AppState;
 
 pub struct ProcessesList {}
 
