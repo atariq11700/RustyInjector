@@ -1,4 +1,4 @@
-use crate::{dllinjector::components::processeslist::sz_exe_to_string, dllinjector::AppState};
+use crate::dllinjector::{components::processeslist::sz_exe_to_string, AppState, injectionmethods};
 use egui::{
     Align2, Color32, ComboBox, Frame, Id, LayerId, Order, RichText, SidePanel, TextStyle, Ui,
 };
@@ -150,9 +150,11 @@ impl Sidebar {
             self.injection_msg = match app_state.selected_process {
                 Some(proc) => match self.injection_type {
                     InjectionTypes::Native => {
+                        injectionmethods::native::inject(proc, self.dll_path.as_ref().unwrap().clone());
                         Some(RichText::new("Injecting with native").color(Color32::GREEN))
                     }
                     InjectionTypes::ManualMap => {
+                        injectionmethods::manualmap::inject(proc, self.dll_path.as_ref().unwrap().clone());
                         Some(RichText::new("Injecting with mm").color(Color32::GREEN))
                     }
                     _ => Some(RichText::new("Unknown Injection Type").color(Color32::RED)),
