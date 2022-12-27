@@ -1,12 +1,9 @@
-use std::{io::Read, ptr::null};
+use std::{io::Read, mem::size_of, ptr::null};
 
-use egui::RichText;
 use std::fs;
-use winapi::um::{
-    winnt::{
-        IMAGE_DOS_HEADER, IMAGE_DOS_SIGNATURE, IMAGE_FILE_HEADER, IMAGE_NT_HEADERS,
-        IMAGE_NT_HEADERS32, IMAGE_OPTIONAL_HEADER,
-    },
+use winapi::um::winnt::{
+    IMAGE_DOS_HEADER, IMAGE_DOS_SIGNATURE, IMAGE_FILE_MACHINE_AMD64,
+    IMAGE_NT_HEADERS,
 };
 
 pub fn isValidDll(dll_path: &str) -> Vec<u8> {
@@ -28,7 +25,7 @@ pub fn isValidDll(dll_path: &str) -> Vec<u8> {
     }
 
     let file_metadata = file_metadata_res.unwrap();
-    if file_metadata.len() < 0x1000 {
+    if file_metadata.len() < size_of::<IMAGE_DOS_HEADER>().try_into().unwrap(){
         println!("{dll_path} has an invalid size");
         return Vec::new();
     }
@@ -43,29 +40,33 @@ pub fn isValidDll(dll_path: &str) -> Vec<u8> {
         return Vec::new();
     }
 
+
+    if file_metadata.len() < dos_header.e_lfanew.try_into().unwrap() {
+        println!("{dll_path} has an invalid size");
+        return Vec::new();
+    }
+
     let nt_header = unsafe {
         (*(file_contents
             .as_ptr()
             .add(dos_header.e_lfanew.try_into().unwrap()) as *const IMAGE_NT_HEADERS))
     };
-    let optional_header = unsafe { (*(&nt_header.OptionalHeader as *const IMAGE_OPTIONAL_HEADER)) };
-    let file_header = unsafe { (*(&nt_header.FileHeader as *const IMAGE_FILE_HEADER)) };
+    let optional_header = nt_header.OptionalHeader;
+    let file_header = nt_header.FileHeader;
 
-    let f = optional_header.CheckSum;
-    let g = optional_header.ImageBase;
-    let h = file_header.Machine;
-
-    unsafe {
-        for i in 0..10 {
-            let byte = file_contents[i];
-            let byte2 = *((&dos_header as *const IMAGE_DOS_HEADER as *const u8).add(i));
-            print!("[{byte},{byte2}] ");
-        }
+    #[cfg(target_pointer_width = "64")]
+    if file_header.Machine != IMAGE_FILE_MACHINE_AMD64 {
+        println!("Host is 64bit and dll is not");
+        return Vec::new();
     }
-    println!("");
-    println!("{f}");
-    println!("{g}");
-    println!("{h}");
 
-    return Vec::new();
+    #[cfg(target_pointer_width = "32")]
+    if file_header.Machine != IMAGE_FILE_MACHINE_I386 {
+        println!("Host is 32bit and dll is not");
+        return Vec::new();
+    }
+
+    println!("Dll is valid");
+
+    return file_contents;
 }

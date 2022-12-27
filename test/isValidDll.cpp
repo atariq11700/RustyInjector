@@ -98,23 +98,6 @@ BYTEARRAY isValidDll(std::string dllpath) {
 #endif
 
     printf("Dll is valid\n");
-
-
-    printf("Some bytes\n");
-    for (int i = 0; i < 10; i++) {
-        printf("%d ", *(pDllBinaryData + i));
-    }
-    printf("\n");
-    printf("Nt sig: %lld\n", pDllNtHeader->Signature);
-    BYTE f = pDllOptHeader->NumberOfRvaAndSizes;
-    BYTE g = pDllOptHeader->DllCharacteristics;
-    BYTE h = pDllFileHeader->Machine;
-
-    printf("%lld\n",f);
-    printf("%lld\n",g);
-    printf("%lld\n",h);
-
-
     return pDllBinaryData;
 
 }
