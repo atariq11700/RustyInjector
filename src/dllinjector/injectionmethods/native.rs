@@ -1,14 +1,11 @@
-
 use winapi::{
+    shared::ntdef::FALSE,
     um::{
-        tlhelp32::PROCESSENTRY32, 
-        processthreadsapi::OpenProcess, 
-        winnt::{
-            HANDLE, 
-            PROCESS_ALL_ACCESS
-        }, 
         handleapi::INVALID_HANDLE_VALUE,
-    }, shared::ntdef::FALSE, 
+        processthreadsapi::OpenProcess,
+        tlhelp32::PROCESSENTRY32,
+        winnt::{HANDLE, PROCESS_ALL_ACCESS},
+    },
 };
 
 pub unsafe fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {

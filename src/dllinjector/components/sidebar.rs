@@ -1,14 +1,10 @@
-
-
-
-use egui::{Color32, ComboBox, Frame, RichText, SidePanel};
 use crate::{dllinjector::components::processeslist::sz_exe_to_string, dllinjector::AppState};
-
+use egui::{Color32, ComboBox, Frame, RichText, SidePanel};
 
 pub struct Sidebar {
     injection_type: InjectionTypes,
     injection_msg: Option<RichText>,
-    dll_path: Option<String>
+    dll_path: Option<String>,
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
@@ -33,7 +29,7 @@ impl Sidebar {
         return Sidebar {
             injection_type: InjectionTypes::Native,
             injection_msg: None,
-            dll_path: None
+            dll_path: None,
         };
     }
     pub fn show(&mut self, ctx: &egui::Context, app_state: &mut AppState) -> () {
@@ -75,6 +71,7 @@ impl Sidebar {
                         },
                         _ => Some(RichText::new("No Selected Process").color(Color32::RED)),
                     };
+                    crate::dllinjector::utils::files::isValidDll("test/dlltobeinjected.dll");
                 };
 
                 if !self.injection_msg.is_none() {
