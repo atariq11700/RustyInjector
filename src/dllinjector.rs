@@ -7,8 +7,8 @@ use components::sidebar::Sidebar;
 use eframe::CreationContext;
 use winapi::um::tlhelp32::PROCESSENTRY32;
 
-pub struct DllInejctorApp<'a> {
-    sidebar: Sidebar<'a>,
+pub struct DllInejctorApp {
+    sidebar: Sidebar,
     process_list: ProcessesList,
     state: AppState,
 }
@@ -25,8 +25,8 @@ impl AppState {
     }
 }
 
-impl DllInejctorApp<'_> {
-    pub fn new<'a>(_creation_contex: &CreationContext) -> DllInejctorApp<'a> {
+impl DllInejctorApp {
+    pub fn new(_creation_contex: &CreationContext) -> DllInejctorApp {
         return DllInejctorApp {
             sidebar: Sidebar::new(),
             process_list: ProcessesList::new(),
@@ -35,7 +35,7 @@ impl DllInejctorApp<'_> {
     }
 }
 
-impl eframe::App for DllInejctorApp<'_> {
+impl eframe::App for DllInejctorApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.sidebar.show(ctx, &mut self.state);
         self.process_list.show(ctx, &mut self.state);
