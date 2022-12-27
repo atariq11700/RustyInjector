@@ -8,7 +8,7 @@ use winapi::{
     },
 };
 
-pub unsafe fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
+pub unsafe fn inject(proc: PROCESSENTRY32, dll_path: &str) -> bool {
     let hTargetProc: HANDLE = OpenProcess(PROCESS_ALL_ACCESS, FALSE as i32, proc.th32ModuleID);
 
     if (hTargetProc == INVALID_HANDLE_VALUE) {

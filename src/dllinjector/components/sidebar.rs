@@ -1,17 +1,17 @@
 use crate::{dllinjector::components::processeslist::sz_exe_to_string, dllinjector::AppState};
 use egui::{Color32, ComboBox, Frame, RichText, SidePanel};
 
-pub struct Sidebar {
+pub struct Sidebar<'a> {
     injection_type: InjectionTypes,
     injection_msg: Option<RichText>,
-    dll_path: Option<String>,
+    dll_path: Option<&'a str>,
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 enum InjectionTypes {
     Native,
     ManualMap,
-    Kernel,
+    _Kernel,
 }
 
 impl InjectionTypes {
@@ -19,13 +19,13 @@ impl InjectionTypes {
         match self {
             InjectionTypes::Native => "Native",
             InjectionTypes::ManualMap => "Manual Map",
-            InjectionTypes::Kernel => "Kernel",
+            InjectionTypes::_Kernel => "Kernel",
         }
     }
 }
 
-impl Sidebar {
-    pub fn new() -> Sidebar {
+impl Sidebar<'_> {
+    pub fn new<'a>() -> Sidebar<'a> {
         return Sidebar {
             injection_type: InjectionTypes::Native,
             injection_msg: None,
@@ -71,7 +71,7 @@ impl Sidebar {
                         },
                         _ => Some(RichText::new("No Selected Process").color(Color32::RED)),
                     };
-                    crate::dllinjector::utils::files::isValidDll("test/dlltobeinjected.dll");
+                    crate::dllinjector::utils::files::is_valid_dll("test/dlltobeinjected.dll");
                 };
 
                 if !self.injection_msg.is_none() {
