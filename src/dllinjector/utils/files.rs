@@ -5,13 +5,14 @@ use winapi::um::winnt::{
     IMAGE_DOS_HEADER, IMAGE_DOS_SIGNATURE, IMAGE_FILE_MACHINE_AMD64, IMAGE_NT_HEADERS,
 };
 
-pub fn is_valid_dll(dll_path: &str) -> Vec<u8> {
-    println!("Checking that {dll_path} exists");
+pub fn is_valid_dll(dll_path: String) -> Vec<u8> {
+    let file_name = &dll_path;
+    println!("Checking that {file_name} exists");
 
-    let file_res = fs::File::open(dll_path);
+    let file_res = fs::File::open(&dll_path);
 
     if file_res.is_err() {
-        println!("Unable to open/access {dll_path}");
+        println!("Unable to open/access {file_name}");
         return Vec::new();
     }
 
@@ -19,13 +20,13 @@ pub fn is_valid_dll(dll_path: &str) -> Vec<u8> {
     let file_metadata_res = file.metadata();
 
     if file_metadata_res.is_err() {
-        println!("Unable to access {dll_path} metadata");
+        println!("Unable to access {file_name} metadata");
         return Vec::new();
     }
 
     let file_metadata = file_metadata_res.unwrap();
     if file_metadata.len() < size_of::<IMAGE_DOS_HEADER>().try_into().unwrap() {
-        println!("{dll_path} has an invalid size");
+        println!("{file_name} has an invalid size");
         return Vec::new();
     }
 
@@ -38,12 +39,12 @@ pub fn is_valid_dll(dll_path: &str) -> Vec<u8> {
     let dos_header: IMAGE_DOS_HEADER =
         unsafe { *(file_contents.as_ptr() as *const IMAGE_DOS_HEADER) };
     if dos_header.e_magic != IMAGE_DOS_SIGNATURE {
-        println!("{dll_path} is not a valid pe image");
+        println!("{file_name} is not a valid pe image");
         return Vec::new();
     }
 
     if file_metadata.len() < dos_header.e_lfanew.try_into().unwrap() {
-        println!("{dll_path} has an invalid size");
+        println!("{file_name} has an invalid size");
         return Vec::new();
     }
 
