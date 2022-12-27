@@ -105,13 +105,14 @@ BYTEARRAY isValidDll(std::string dllpath) {
         printf("%d ", *(pDllBinaryData + i));
     }
     printf("\n");
+    printf("Nt sig: %lld\n", pDllNtHeader->Signature);
     BYTE f = pDllOptHeader->NumberOfRvaAndSizes;
     BYTE g = pDllOptHeader->DllCharacteristics;
     BYTE h = pDllFileHeader->Machine;
 
-    printf("%llx\n",f);
-    printf("%llx\n",g);
-    printf("%llx\n",h);
+    printf("%lld\n",f);
+    printf("%lld\n",g);
+    printf("%lld\n",h);
 
 
     return pDllBinaryData;
