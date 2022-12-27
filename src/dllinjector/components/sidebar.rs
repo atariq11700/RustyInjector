@@ -159,7 +159,6 @@ impl Sidebar {
                 },
                 _ => Some(RichText::new("No Selected Process").color(Color32::RED)),
             };
-            crate::dllinjector::utils::files::is_valid_dll("test/dlltobeinjected.dll");
         };
     }
 }
