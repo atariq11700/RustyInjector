@@ -45,6 +45,7 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
     if (addr as usize) == 0 {
         println!("Unable to allocte memory inside target process");
         unsafe { CloseHandle(target_proc) };
+        return false;
     }
 
     let mut _f: SIZE_T = 0;
@@ -60,6 +61,7 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
     {
         println!("Unable to write dll path to target process");
         unsafe { CloseHandle(target_proc) };
+        return false;
     }
 
     let new_thread = unsafe {
@@ -81,6 +83,7 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
     if new_thread == INVALID_HANDLE_VALUE {
         println!("Unable to create a remote thread");
         unsafe { CloseHandle(target_proc) };
+        return false;
     }
 
     unsafe {
