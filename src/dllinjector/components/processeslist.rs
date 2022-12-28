@@ -46,10 +46,10 @@ fn render_processes(ui: &mut Ui, procs: Vec<PROCESSENTRY32>, app_state: &mut App
         );
         let button_color = match app_state.selected_process {
             Some(selected_proc) => match selected_proc.th32ProcessID == proc.th32ProcessID {
-                true => Color32::RED,
-                false => Color32::BLUE,
+                true => Color32::GRAY,
+                false => Color32::GOLD,
             },
-            None => Color32::BLUE,
+            None => Color32::GOLD,
         };
         let button = ui.button(RichText::new(button_text).color(button_color));
 
