@@ -9,7 +9,7 @@ use winapi::{
         handleapi::{CloseHandle, INVALID_HANDLE_VALUE},
         libloaderapi::{GetModuleHandleA, GetProcAddress},
         memoryapi::{VirtualAllocEx, WriteProcessMemory},
-        minwinbase::{LPSECURITY_ATTRIBUTES},
+        minwinbase::LPSECURITY_ATTRIBUTES,
         processthreadsapi::{CreateRemoteThreadEx, OpenProcess, LPPROC_THREAD_ATTRIBUTE_LIST},
         tlhelp32::PROCESSENTRY32,
         winnt::{HANDLE, MEM_COMMIT, MEM_RESERVE, PAGE_EXECUTE_READWRITE, PROCESS_ALL_ACCESS},

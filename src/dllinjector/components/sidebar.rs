@@ -145,7 +145,6 @@ impl Sidebar {
         }
     }
 
-
     fn injection_button(&mut self, app_state: &AppState, ui: &mut Ui) {
         if ui.button("Inject").clicked() {
             self.injection_msg = match app_state.selected_process {
