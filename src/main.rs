@@ -8,7 +8,7 @@ fn main() {
     };
 
     eframe::run_native(
-        "Dll Injector",
+        "Rusty Injector",
         options,
         Box::new(|cc| {
             return Box::new(match cc.storage {

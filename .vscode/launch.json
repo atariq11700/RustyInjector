@@ -7,7 +7,7 @@
         "name": "Launch",
         "type": "cppvsdbg",
         "request": "launch",
-        "program": "${workspaceFolder}/target/debug/dllinjector.exe",
+        "program": "${workspaceFolder}/target/debug/.exe",
         "args": [],
         "stopAtEntry": false,
         "cwd": "${fileDirname}",

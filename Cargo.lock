@@ -3,6 +3,21 @@
 version = 3
 
 [[package]]
+name = "RustyInjector"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "egui",
+ "image",
+ "memoffset 0.5.6",
+ "rfd",
+ "strum",
+ "strum_macros",
+ "winapi",
+ "winres",
+]
+
+[[package]]
 name = "ab_glyph"
 version = "0.2.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -487,21 +502,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac1b7517328c04c2aa68422fc60a41b92208182142ed04a25879c26c8f878794"
 dependencies = [
  "libloading",
-]
-
-[[package]]
-name = "dllinjector"
-version = "0.1.0"
-dependencies = [
- "eframe",
- "egui",
- "image",
- "memoffset 0.5.6",
- "rfd",
- "strum",
- "strum_macros",
- "winapi",
- "winres",
 ]
 
 [[package]]
