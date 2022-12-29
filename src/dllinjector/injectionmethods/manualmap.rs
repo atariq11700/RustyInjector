@@ -20,7 +20,7 @@ use winapi::{
     },
 };
 
-use crate::dllinjector::utils;
+use crate::utils;
 
 type f_LoadLibraryA = unsafe extern "system" fn(lpLibraryFilename: LPCSTR) -> HINSTANCE;
 type f_GetProcAddress = unsafe extern "system" fn(hModule: HMODULE, lpProcName: LPCSTR) -> FARPROC;

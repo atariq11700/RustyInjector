@@ -16,7 +16,7 @@ use winapi::{
     },
 };
 
-use crate::dllinjector::utils;
+use crate::utils;
 
 pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
     let dll_data = utils::files::is_valid_dll(dll_path.clone());

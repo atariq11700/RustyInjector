@@ -1,6 +1,5 @@
 mod components;
 mod injectionmethods;
-mod utils;
 
 use components::processeslist::ProcessesList;
 use components::sidebar::Sidebar;
