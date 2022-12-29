@@ -3,7 +3,7 @@ use std::ptr::addr_of;
 use winapi::{
     ctypes::c_void,
     shared::{
-        basetsd::SIZE_T,
+        basetsd::{SIZE_T, ULONG_PTR},
         minwindef::{BOOL, DWORD, FARPROC, HINSTANCE, HMODULE, LPCVOID, LPVOID, WORD},
         ntdef::{HANDLE, LPCSTR},
     },
@@ -46,15 +46,37 @@ fn needs_reloc(reloc_info: WORD) -> bool {
 
 //todo: broken
 fn image_first_section(pnt_header: PIMAGE_NT_HEADERS) -> PIMAGE_SECTION_HEADER {
-    return unsafe {
-        pnt_header
-            .add(memoffset::offset_of!(IMAGE_NT_HEADERS, OptionalHeader))
-            .add(
-                (*pnt_header as IMAGE_NT_HEADERS)
-                    .FileHeader
-                    .SizeOfOptionalHeader as usize,
-            ) as PIMAGE_SECTION_HEADER
-    };
+    let base = (pnt_header as ULONG_PTR);
+    let off1 = memoffset::offset_of!(IMAGE_NT_HEADERS, OptionalHeader);
+    let off2 = ((unsafe { *pnt_header } as IMAGE_NT_HEADERS)
+        .FileHeader
+        .SizeOfOptionalHeader) as usize;
+    return (base + off1 + off2) as PIMAGE_SECTION_HEADER;
+}
+
+struct SectionName {
+    bytes: [u8; 8],
+}
+impl SectionName {
+    fn from(name_array: [u8; 8]) -> SectionName {
+        return SectionName { bytes: name_array };
+    }
+}
+impl std::fmt::Display for SectionName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}{}{}{}{}{}{}{}",
+            self.bytes[0] as char,
+            self.bytes[1] as char,
+            self.bytes[2] as char,
+            self.bytes[3] as char,
+            self.bytes[4] as char,
+            self.bytes[5] as char,
+            self.bytes[6] as char,
+            self.bytes[7] as char
+        )
+    }
 }
 
 pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
@@ -110,7 +132,7 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
 
     let mut section_header =
         image_first_section(&nt_header as *const IMAGE_NT_HEADERS as PIMAGE_NT_HEADERS);
-
+    println!("{:x}", dll_data.as_ptr() as usize);
     for i in 0..file_header.NumberOfSections {
         unsafe {
             if (*section_header).SizeOfRawData > 0 {
@@ -126,7 +148,10 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
                     0 as *mut usize,
                 ) == 0
                 {
-                    println!("Unable to map section {name:?} into target process memory");
+                    println!(
+                        "Unable to map section {} into target process memory",
+                        SectionName::from(name)
+                    );
                     CloseHandle(target_proc);
                     VirtualFreeEx(
                         target_proc,
@@ -137,8 +162,8 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
                     return false;
                 }
                 println!(
-                    "Mapped dll section {:?} {} into target process as 0x{:x}",
-                    name,
+                    "Mapped dll section {} ({}) into target process as 0x{:x}",
+                    SectionName::from(name),
                     (*section_header).SizeOfRawData,
                     base_addr_ex.add((*section_header).VirtualAddress as usize) as usize
                 );
