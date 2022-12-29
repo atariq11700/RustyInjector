@@ -57,6 +57,11 @@ impl Sidebar {
                 if !self.injection_msg.is_none() {
                     ui.label(self.injection_msg.as_ref().unwrap().clone());
                 }
+
+                ui.checkbox(
+                    &mut app_state.save_state,
+                    "Save the last used dll file and process filter on exit?",
+                )
             });
     }
 
@@ -168,5 +173,20 @@ impl Sidebar {
                 _ => Some(RichText::new("No Selected Process").color(Color32::RED)),
             };
         };
+    }
+
+    pub fn save(&self, storage: &mut dyn eframe::Storage) {
+        storage.set_string(
+            "sidebar_last_dll",
+            self.dll_path.clone().unwrap_or_default(),
+        )
+    }
+
+    pub fn load(storage: &dyn eframe::Storage) -> Sidebar {
+        Sidebar {
+            injection_type: InjectionTypes::Native,
+            injection_msg: None,
+            dll_path: storage.get_string("sidebar_last_dll"),
+        }
     }
 }

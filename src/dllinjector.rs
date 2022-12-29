@@ -2,6 +2,8 @@ mod components;
 mod injectionmethods;
 mod utils;
 
+use std::collections::hash_map::Values;
+
 use components::processeslist::ProcessesList;
 use components::sidebar::Sidebar;
 use eframe::CreationContext;
@@ -15,13 +17,27 @@ pub struct DllInejctorApp {
 
 pub struct AppState {
     selected_process: Option<PROCESSENTRY32>,
+    save_state: bool,
 }
 
 impl AppState {
     fn new() -> AppState {
         return AppState {
             selected_process: None,
+            save_state: false,
         };
+    }
+    fn save(&self, storage: &mut dyn eframe::Storage) {
+        storage.set_string("appstate_save_state", self.save_state.to_string())
+    }
+    fn load(storage: &dyn eframe::Storage) -> AppState {
+        AppState {
+            selected_process: None,
+            save_state: match storage.get_string("appstate_save_state") {
+                Some(value) => value.trim().parse().unwrap(),
+                _ => false,
+            },
+        }
     }
 }
 
@@ -33,11 +49,30 @@ impl DllInejctorApp {
             state: AppState::new(),
         };
     }
+
+    pub fn load(creation_context: &CreationContext) -> DllInejctorApp {
+        let storage = creation_context.storage.unwrap();
+        let prev_state = AppState::load(storage);
+
+        match prev_state.save_state {
+            true => DllInejctorApp {
+                sidebar: Sidebar::load(storage),
+                process_list: ProcessesList::load(storage),
+                state: prev_state,
+            },
+            false => DllInejctorApp::new(creation_context),
+        }
+    }
 }
 
 impl eframe::App for DllInejctorApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.sidebar.show(ctx, &mut self.state);
         self.process_list.show(ctx, &mut self.state);
+    }
+    fn save(&mut self, _storage: &mut dyn eframe::Storage) {
+        self.state.save(_storage);
+        self.sidebar.save(_storage);
+        self.process_list.save(_storage);
     }
 }

@@ -22,7 +22,7 @@ pub struct ProcessesList {
 impl ProcessesList {
     pub fn new() -> ProcessesList {
         return ProcessesList {
-            filter_string: "".to_owned()
+            filter_string: "".to_owned(),
         };
     }
 
@@ -44,14 +44,13 @@ impl ProcessesList {
     fn render_processes(&self, ui: &mut Ui, procs: Vec<PROCESSENTRY32>, app_state: &mut AppState) {
         for proc in procs {
             let proc_name = sz_exe_to_string(proc.szExeFile);
-            if ! proc_name.to_ascii_lowercase().starts_with(&self.filter_string) {
+            if !proc_name
+                .to_ascii_lowercase()
+                .starts_with(&self.filter_string)
+            {
                 continue;
             }
-            let button_text = format!(
-                "[{:>12}] - {:<30}",
-                proc.th32ProcessID,
-                proc_name
-            );
+            let button_text = format!("[{:>12}] - {:<30}", proc.th32ProcessID, proc_name);
             let button_color = match app_state.selected_process {
                 Some(selected_proc) => match selected_proc.th32ProcessID == proc.th32ProcessID {
                     true => Color32::GRAY,
@@ -60,16 +59,24 @@ impl ProcessesList {
                 None => Color32::GOLD,
             };
             let button = ui.button(RichText::new(button_text).color(button_color));
-    
+
             if button.clicked() {
                 println!("Button Clicked {proc_name}");
                 app_state.selected_process = Some(proc);
             }
         }
     }
+
+    pub fn save(&self, storage: &mut dyn eframe::Storage) {
+        storage.set_string("pl_proc_filter", self.filter_string.clone());
+    }
+
+    pub fn load(storage: &dyn eframe::Storage) -> ProcessesList {
+        ProcessesList {
+            filter_string: storage.get_string("pl_proc_filter").unwrap_or_default(),
+        }
+    }
 }
-
-
 
 fn get_processes() -> Option<Vec<PROCESSENTRY32>> {
     let mut procs: Vec<PROCESSENTRY32> = Vec::new();
