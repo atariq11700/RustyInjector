@@ -8,7 +8,13 @@
 				"$rustc"
 			],
 			"group": "build",
-			"label": "rust: cargo build"
+			"label": "rust: cargo build",
+			"dependsOn" : "rust: cargo fmt"
+		},
+		{
+			"type": "cargo",
+			"command": "fmt",
+			"label":"rust: cargo fmt"
 		}
 	]
 }
