@@ -1,7 +1,12 @@
 mod dllinjector;
+mod utils;
 
 fn main() {
-    let options = eframe::NativeOptions::default();
+    let options = eframe::NativeOptions {
+        icon_data: Some(utils::files::load_icon("res/icon.png")),
+        ..Default::default()
+    };
+
     eframe::run_native(
         "Dll Injector",
         options,
