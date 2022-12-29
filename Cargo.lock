@@ -400,7 +400,7 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "egui",
- "memoffset 0.2.1",
+ "memoffset 0.5.6",
  "rfd",
  "winapi",
 ]
@@ -951,9 +951,12 @@ dependencies = [
 
 [[package]]
 name = "memoffset"
-version = "0.2.1"
+version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f9dc261e2b62d7a622bf416ea3c5245cdd5d9a7fcc428c0d06804dfce1775b3"
+checksum = "043175f069eda7b85febe4a74abbaeff828d9f8b448515d3151a14a3542811aa"
+dependencies = [
+ "autocfg",
+]
 
 [[package]]
 name = "memoffset"
