@@ -2,8 +2,6 @@ mod components;
 mod injectionmethods;
 mod utils;
 
-use std::collections::hash_map::Values;
-
 use components::processeslist::ProcessesList;
 use components::sidebar::Sidebar;
 use eframe::CreationContext;
@@ -70,9 +68,9 @@ impl eframe::App for DllInejctorApp {
         self.sidebar.show(ctx, &mut self.state);
         self.process_list.show(ctx, &mut self.state);
     }
-    fn save(&mut self, _storage: &mut dyn eframe::Storage) {
-        self.state.save(_storage);
-        self.sidebar.save(_storage);
-        self.process_list.save(_storage);
+    fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        self.state.save(storage);
+        self.sidebar.save(storage);
+        self.process_list.save(storage);
     }
 }

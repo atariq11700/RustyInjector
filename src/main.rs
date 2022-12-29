@@ -8,7 +8,7 @@ fn main() {
         Box::new(|cc| {
             return Box::new(match cc.storage {
                 Some(_) => dllinjector::DllInejctorApp::load(cc),
-                None => dllinjector::DllInejctorApp::new(cc)
+                None => dllinjector::DllInejctorApp::new(cc),
             });
         }),
     );
