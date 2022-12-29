@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use egui::{CentralPanel, Color32, Frame, RichText, ScrollArea, Ui};
 use winapi::{
     shared::{
