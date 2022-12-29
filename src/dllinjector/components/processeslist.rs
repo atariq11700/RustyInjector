@@ -46,7 +46,7 @@ impl ProcessesList {
     fn render_processes(&self, ui: &mut Ui, procs: Vec<PROCESSENTRY32>, app_state: &mut AppState) {
         for proc in procs {
             let proc_name = sz_exe_to_string(proc.szExeFile);
-            if ! proc_name.starts_with(&self.filter_string) {
+            if ! proc_name.to_ascii_lowercase().starts_with(&self.filter_string) {
                 continue;
             }
             let button_text = format!(
