@@ -3,6 +3,8 @@ use egui::{
     Align2, Color32, ComboBox, Frame, Id, LayerId, Order, RichText, SidePanel, TextStyle, Ui,
 };
 use std::fmt::Write;
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
 
 pub struct Sidebar {
     injection_type: InjectionTypes,
@@ -10,7 +12,7 @@ pub struct Sidebar {
     dll_path: Option<String>,
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, EnumIter)]
 enum InjectionTypes {
     Native,
     ManualMap,
@@ -24,6 +26,19 @@ impl InjectionTypes {
             InjectionTypes::ManualMap => "Manual Map",
             InjectionTypes::_Kernel => "Kernel",
         }
+    }
+    fn from_string(str: &str) -> InjectionTypes {
+        for ty in InjectionTypes::iter() {
+            if str == ty.to_string() {
+                return ty;
+            }
+        }
+        return InjectionTypes::default();
+    }
+}
+impl std::default::Default for InjectionTypes {
+    fn default() -> Self {
+        return InjectionTypes::Native;
     }
 }
 
@@ -60,7 +75,7 @@ impl Sidebar {
 
                 ui.checkbox(
                     &mut app_state.save_state,
-                    "Save the last used dll file and process filter on exit?",
+                    "Save dll file/process filter/injection type on exit?",
                 )
             });
     }
@@ -179,12 +194,21 @@ impl Sidebar {
         storage.set_string(
             "sidebar_last_dll",
             self.dll_path.clone().unwrap_or_default(),
-        )
+        );
+        storage.set_string(
+            "sidebar_injection_type",
+            self.injection_type.to_string().to_owned(),
+        );
     }
 
     pub fn load(storage: &dyn eframe::Storage) -> Sidebar {
         Sidebar {
-            injection_type: InjectionTypes::Native,
+            injection_type: InjectionTypes::from_string(
+                storage
+                    .get_string("sidebar_injection_type")
+                    .unwrap_or_default()
+                    .as_str(),
+            ),
             injection_msg: None,
             dll_path: storage.get_string("sidebar_last_dll"),
         }
