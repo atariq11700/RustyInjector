@@ -157,23 +157,25 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
 
     let mut psection_header =
         image_first_section(nt_header as *const IMAGE_NT_HEADERS as PIMAGE_NT_HEADERS);
+
     for i in 0..file_header.NumberOfSections {
         unsafe {
+            let section_header = &*psection_header;
             println!(
                 "Found section header {} at 0x{:x}",
-                SectionName::from((*psection_header).Name),
+                SectionName::from(section_header.Name),
                 psection_header as usize
             );
-            if (*psection_header).SizeOfRawData > 0 {
-                let name = (*psection_header).Name;
+            if section_header.SizeOfRawData > 0 {
+                let name = section_header.Name;
                 if WriteProcessMemory(
                     target_proc,
-                    base_addr_ex.add((*psection_header).VirtualAddress as usize),
+                    base_addr_ex.add(section_header.VirtualAddress as usize),
                     dll_data
                         .as_ptr()
-                        .add((*psection_header).PointerToRawData as usize)
+                        .add(section_header.PointerToRawData as usize)
                         as LPCVOID,
-                    (*psection_header).SizeOfRawData as SIZE_T,
+                    section_header.SizeOfRawData as SIZE_T,
                     0 as *mut usize,
                 ) == 0
                 {
@@ -193,8 +195,8 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
                 println!(
                     "Mapped dll section {} ({}) into target process as 0x{:x}",
                     SectionName::from(name),
-                    (*psection_header).SizeOfRawData,
-                    base_addr_ex.add((*psection_header).VirtualAddress as usize) as usize
+                    section_header.SizeOfRawData,
+                    base_addr_ex.add(section_header.VirtualAddress as usize) as usize
                 );
             }
             psection_header = psection_header.add(1);
