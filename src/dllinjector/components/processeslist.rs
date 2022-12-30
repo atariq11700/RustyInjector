@@ -22,7 +22,7 @@ pub struct ProcessesList {
 impl ProcessesList {
     pub fn new() -> ProcessesList {
         return ProcessesList {
-            filter_string: "".to_owned(),
+            filter_string: String::default(),
         };
     }
 
