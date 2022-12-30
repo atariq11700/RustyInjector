@@ -1,7 +1,4 @@
-use std::ptr::addr_of;
-
 use winapi::{
-    ctypes::c_void,
     shared::{
         basetsd::{SIZE_T, ULONG_PTR},
         minwindef::{BOOL, DWORD, FARPROC, HINSTANCE, HMODULE, LPCVOID, LPVOID, WORD},
@@ -13,9 +10,10 @@ use winapi::{
         processthreadsapi::OpenProcess,
         tlhelp32::PROCESSENTRY32,
         winnt::{
-            IMAGE_DOS_HEADER, IMAGE_NT_HEADERS, IMAGE_REL_BASED_DIR64, IMAGE_REL_BASED_HIGHLOW,
-            IMAGE_SECTION_HEADER, MEM_COMMIT, MEM_FREE, MEM_RESERVE, PAGE_EXECUTE_READWRITE,
-            PIMAGE_NT_HEADERS, PIMAGE_SECTION_HEADER, PROCESS_ALL_ACCESS,
+            IMAGE_DOS_HEADER, IMAGE_FILE_HEADER, IMAGE_NT_HEADERS, IMAGE_OPTIONAL_HEADER,
+            IMAGE_REL_BASED_DIR64, IMAGE_REL_BASED_HIGHLOW, IMAGE_SECTION_HEADER, MEM_COMMIT,
+            MEM_FREE, MEM_RESERVE, PAGE_EXECUTE_READWRITE, PIMAGE_NT_HEADERS,
+            PIMAGE_SECTION_HEADER, PROCESS_ALL_ACCESS,
         },
     },
 };
@@ -86,6 +84,11 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
         return false;
     }
 
+    println!(
+        "Dll loaded in host process at 0x{:x}",
+        dll_data.as_ptr() as usize
+    );
+
     let target_proc: HANDLE =
         unsafe { OpenProcess(PROCESS_ALL_ACCESS, false as BOOL, proc.th32ProcessID) };
 
@@ -94,14 +97,32 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
         return false;
     }
 
-    let dos_header: IMAGE_DOS_HEADER = unsafe { *(dll_data.as_ptr() as *const IMAGE_DOS_HEADER) };
+    let dos_header: &IMAGE_DOS_HEADER = unsafe { &*(dll_data.as_ptr() as *const IMAGE_DOS_HEADER) };
     let nt_header = unsafe {
-        *(dll_data
+        &*(dll_data
             .as_ptr()
             .add(dos_header.e_lfanew.try_into().unwrap()) as *const IMAGE_NT_HEADERS)
     };
-    let optional_header = nt_header.OptionalHeader;
-    let file_header = nt_header.FileHeader;
+    let optional_header = &nt_header.OptionalHeader;
+    let file_header = &nt_header.FileHeader;
+
+    println!(
+        "Dll dos header in host process found at 0x{:x}",
+        dos_header as *const IMAGE_DOS_HEADER as usize
+    );
+    println!(
+        "Dll nt header in host process found at 0x{:x}",
+        nt_header as *const IMAGE_NT_HEADERS as usize
+    );
+    println!(
+        "Dll optional header in host process found at 0x{:x}",
+        optional_header as *const IMAGE_OPTIONAL_HEADER as usize
+    );
+
+    println!(
+        "Dll file header in host process found at 0x{:x}",
+        file_header as *const IMAGE_FILE_HEADER as usize
+    );
 
     let mut base_addr_ex = unsafe {
         VirtualAllocEx(
@@ -129,22 +150,30 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
         println!("Unable to allocate memory inside target process for dll");
         unsafe { CloseHandle(target_proc) };
     }
+    println!(
+        "Allocated 0x{:x} bytes in target proc at 0x{:x}",
+        optional_header.SizeOfImage, base_addr_ex as usize
+    );
 
-    let mut section_header =
-        image_first_section(&nt_header as *const IMAGE_NT_HEADERS as PIMAGE_NT_HEADERS);
-    println!("{:x}", dll_data.as_ptr() as usize);
+    let mut psection_header =
+        image_first_section(nt_header as *const IMAGE_NT_HEADERS as PIMAGE_NT_HEADERS);
     for i in 0..file_header.NumberOfSections {
         unsafe {
-            if (*section_header).SizeOfRawData > 0 {
-                let name = (*section_header).Name;
+            println!(
+                "Found section header {} at 0x{:x}",
+                SectionName::from((*psection_header).Name),
+                psection_header as usize
+            );
+            if (*psection_header).SizeOfRawData > 0 {
+                let name = (*psection_header).Name;
                 if WriteProcessMemory(
                     target_proc,
-                    base_addr_ex.add((*section_header).VirtualAddress as usize),
+                    base_addr_ex.add((*psection_header).VirtualAddress as usize),
                     dll_data
                         .as_ptr()
-                        .add((*section_header).PointerToRawData as usize)
+                        .add((*psection_header).PointerToRawData as usize)
                         as LPCVOID,
-                    (*section_header).SizeOfRawData as SIZE_T,
+                    (*psection_header).SizeOfRawData as SIZE_T,
                     0 as *mut usize,
                 ) == 0
                 {
@@ -164,12 +193,11 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
                 println!(
                     "Mapped dll section {} ({}) into target process as 0x{:x}",
                     SectionName::from(name),
-                    (*section_header).SizeOfRawData,
-                    base_addr_ex.add((*section_header).VirtualAddress as usize) as usize
+                    (*psection_header).SizeOfRawData,
+                    base_addr_ex.add((*psection_header).VirtualAddress as usize) as usize
                 );
             }
-            section_header =
-                section_header.add(std::mem::size_of::<IMAGE_SECTION_HEADER>() as usize);
+            psection_header = psection_header.add(1);
         }
     }
 
