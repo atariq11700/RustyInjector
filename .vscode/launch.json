@@ -7,10 +7,10 @@
         "name": "Launch",
         "type": "cppvsdbg",
         "request": "launch",
-        "program": "${workspaceFolder}/target/debug/.exe",
+        "program": "${workspaceFolder}/target/debug/RustyInjector.exe",
         "args": [],
         "stopAtEntry": false,
-        "cwd": "${fileDirname}",
+        "cwd": "${workspaceFolder}",
         "environment": [],
         "console": "integratedTerminal",
         "preLaunchTask": "rust: cargo build"
