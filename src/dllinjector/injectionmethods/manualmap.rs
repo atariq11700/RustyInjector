@@ -158,7 +158,7 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
     let mut psection_header =
         image_first_section(nt_header as *const IMAGE_NT_HEADERS as PIMAGE_NT_HEADERS);
 
-    for i in 0..file_header.NumberOfSections {
+    for _ in 0..file_header.NumberOfSections {
         unsafe {
             let section_header = &*psection_header;
             println!(
