@@ -3,6 +3,7 @@ name = "RustyInjector"
 version = "0.1.0"
 edition = "2021"
 build = "build.rs"
+default-run = "RustyInjector"
 
 [build-dependencies]
 winres = "0.1.12"
@@ -22,3 +23,21 @@ memoffset = "0.5.0"
 strum = "0.24.1"
 strum_macros = "0.24.1"
 image = "0.24.2"
+
+[workspace]
+members = [
+    "test/dummy_process"
+]
+
+[[bin]]
+name = "RustyInjector"
+path = "src/main.rs"
+
+[[bin]]
+name = "DummyProcess"
+path = "test/dummy_process/src/main.rs"
+
+[lib]
+name = "dlltobeinjected"
+path = "test/dummy_dll/src/lib.rs"
+crate-type = ["cdylib"]

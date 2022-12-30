@@ -3,6 +3,10 @@
 version = 3
 
 [[package]]
+name = "DummyProcess"
+version = "0.1.0"
+
+[[package]]
 name = "RustyInjector"
 version = "0.1.0"
 dependencies = [
