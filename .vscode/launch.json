@@ -13,6 +13,6 @@
         "cwd": "${workspaceFolder}",
         "environment": [],
         "console": "integratedTerminal",
-        "preLaunchTask": "rust: cargo build"
+        "preLaunchTask": "Launch dummy proc"
     }]
 }

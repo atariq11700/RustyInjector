@@ -27,6 +27,14 @@
 				"kind": "build",
 				"isDefault": true
 			}
-		}
+		},
+		{
+			"label": "Launch dummy proc",
+			"type": "shell",
+			"command": "Start-Process",
+			"args": ["${workspaceFolder}/target/debug/dummyprocess.exe"],
+			"dependsOn": ["rust: cargo build"],
+		},
+		
 	]
 }
