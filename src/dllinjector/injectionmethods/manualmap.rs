@@ -1,4 +1,5 @@
 use winapi::{
+    ctypes::c_void,
     shared::{
         basetsd::{SIZE_T, ULONG_PTR},
         minwindef::{BOOL, DWORD, FARPROC, HINSTANCE, HMODULE, LPCVOID, LPDWORD, LPVOID, WORD},
@@ -99,6 +100,13 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
         return false;
     }
 
+    println!(
+        "Opened process [{}] {}, Handle: 0x{:x}",
+        proc.th32ProcessID,
+        crate::dllinjector::components::processeslist::sz_exe_to_string(proc.szExeFile),
+        target_proc as usize
+    );
+
     let dos_header: &IMAGE_DOS_HEADER = unsafe { &*(dll_data.as_ptr() as *const IMAGE_DOS_HEADER) };
     let nt_header = unsafe {
         &*(dll_data
@@ -133,7 +141,7 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
             optional_header.SizeOfImage as SIZE_T,
             MEM_RESERVE | MEM_COMMIT,
             PAGE_EXECUTE_READWRITE,
-        )
+        ) as *mut u8
     };
 
     if base_addr_ex as usize == 0 {
@@ -144,7 +152,7 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
                 optional_header.SizeOfImage as SIZE_T,
                 MEM_RESERVE | MEM_COMMIT,
                 PAGE_EXECUTE_READWRITE,
-            )
+            ) as *mut u8
         };
     }
 
@@ -172,7 +180,7 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
                 let name = section_header.Name;
                 if WriteProcessMemory(
                     target_proc,
-                    base_addr_ex.add(section_header.VirtualAddress as usize),
+                    base_addr_ex.add(section_header.VirtualAddress as usize) as LPVOID,
                     dll_data
                         .as_ptr()
                         .add(section_header.PointerToRawData as usize)
@@ -188,7 +196,7 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
                     CloseHandle(target_proc);
                     VirtualFreeEx(
                         target_proc,
-                        base_addr_ex,
+                        base_addr_ex as LPVOID,
                         optional_header.SizeOfImage as SIZE_T,
                         MEM_FREE,
                     );
@@ -208,7 +216,7 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
     if unsafe {
         WriteProcessMemory(
             target_proc,
-            base_addr_ex,
+            base_addr_ex as LPVOID,
             dll_data.as_ptr() as LPCVOID,
             0x1000,
             0 as *mut SIZE_T,
@@ -228,7 +236,7 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
     if unsafe {
         WriteProcessMemory(
             target_proc,
-            base_addr_ex,
+            base_addr_ex as LPVOID,
             &mm_data as *const ManualMapLoaderData as LPCVOID,
             std::mem::size_of::<ManualMapLoaderData>(),
             0 as *mut SIZE_T,
@@ -276,7 +284,7 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
             0 as LPSECURITY_ATTRIBUTES,
             0,
             std::mem::transmute(loader_addr),
-            base_addr_ex,
+            base_addr_ex as LPVOID,
             0,
             0 as LPPROC_THREAD_ATTRIBUTE_LIST,
             0 as LPDWORD,
@@ -298,6 +306,4 @@ extern "system" fn loader(pmm_data: *mut ManualMapLoaderData) {
     let _LoadLibraryA = unsafe { (*pmm_data).pLoadLibraryA };
     let _GetProcAddress = unsafe { &(*pmm_data).pGetProcAddress };
     let base_addr = pmm_data as *const u8;
-
-    println!("Hi from loader func");
 }
