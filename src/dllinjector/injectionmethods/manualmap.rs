@@ -1,13 +1,16 @@
 use winapi::{
     shared::{
         basetsd::{SIZE_T, ULONG_PTR},
-        minwindef::{BOOL, DWORD, FARPROC, HINSTANCE, HMODULE, LPCVOID, LPVOID, WORD},
+        minwindef::{BOOL, DWORD, FARPROC, HINSTANCE, HMODULE, LPCVOID, LPDWORD, LPVOID, WORD},
         ntdef::{HANDLE, LPCSTR},
     },
     um::{
+        consoleapi::AllocConsole,
         handleapi::{CloseHandle, INVALID_HANDLE_VALUE},
+        libloaderapi::{GetProcAddress, LoadLibraryA},
         memoryapi::{VirtualAllocEx, VirtualFreeEx, WriteProcessMemory},
-        processthreadsapi::OpenProcess,
+        minwinbase::LPSECURITY_ATTRIBUTES,
+        processthreadsapi::{CreateRemoteThreadEx, OpenProcess, LPPROC_THREAD_ATTRIBUTE_LIST},
         tlhelp32::PROCESSENTRY32,
         winnt::{
             IMAGE_DOS_HEADER, IMAGE_FILE_HEADER, IMAGE_NT_HEADERS, IMAGE_OPTIONAL_HEADER,
@@ -42,7 +45,6 @@ fn needs_reloc(reloc_info: WORD) -> bool {
     return (reloc_info >> 0x0C) == IMAGE_REL_BASED_HIGHLOW;
 }
 
-//todo: broken
 fn image_first_section(pnt_header: PIMAGE_NT_HEADERS) -> PIMAGE_SECTION_HEADER {
     let base = (pnt_header as ULONG_PTR);
     let off1 = memoffset::offset_of!(IMAGE_NT_HEADERS, OptionalHeader);
@@ -203,5 +205,99 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
         }
     }
 
-    return false;
+    if unsafe {
+        WriteProcessMemory(
+            target_proc,
+            base_addr_ex,
+            dll_data.as_ptr() as LPCVOID,
+            0x1000,
+            0 as *mut SIZE_T,
+        )
+    } == 0
+    {
+        println!("Unable to write pe headers to target process");
+    }
+    println!("Wrote pe headers to target process");
+
+    let mm_data = ManualMapLoaderData {
+        pLoadLibraryA: LoadLibraryA,
+        pGetProcAddress: GetProcAddress,
+        pDllBaseAddr: base_addr_ex as HINSTANCE,
+    };
+
+    if unsafe {
+        WriteProcessMemory(
+            target_proc,
+            base_addr_ex,
+            &mm_data as *const ManualMapLoaderData as LPCVOID,
+            std::mem::size_of::<ManualMapLoaderData>(),
+            0 as *mut SIZE_T,
+        )
+    } == 0
+    {
+        println!("Unable to write loader data");
+    }
+    println!("Wrote loader data to target process");
+
+    let loader_addr = unsafe {
+        VirtualAllocEx(
+            target_proc,
+            0 as LPVOID,
+            0x1000,
+            MEM_RESERVE | MEM_COMMIT,
+            PAGE_EXECUTE_READWRITE,
+        )
+    };
+    if loader_addr as usize == 0 {
+        println!("Unable to allocate data in target process for oader funtion");
+    }
+    println!(
+        "Allocated 0x1000 bytes at 0x{:x} inside the target process for the loader function",
+        loader_addr as usize
+    );
+
+    if unsafe {
+        WriteProcessMemory(
+            target_proc,
+            loader_addr,
+            loader as LPCVOID,
+            0x1000,
+            0 as *mut SIZE_T,
+        )
+    } == 0
+    {
+        println!("Unable to write loader function to the target process");
+    }
+    println!("Wrote loader function to the target process");
+
+    if unsafe {
+        CreateRemoteThreadEx(
+            target_proc,
+            0 as LPSECURITY_ATTRIBUTES,
+            0,
+            std::mem::transmute(loader_addr),
+            base_addr_ex,
+            0,
+            0 as LPPROC_THREAD_ATTRIBUTE_LIST,
+            0 as LPDWORD,
+        )
+    } == INVALID_HANDLE_VALUE
+    {
+        println!("Unable to create remote thread inside the target process");
+    }
+    println!("Created remote thread inside the target process");
+
+    return true;
+}
+
+extern "system" fn loader(pmm_data: *mut ManualMapLoaderData) {
+    if pmm_data as usize == 0 {
+        return;
+    }
+
+    let _LoadLibraryA = unsafe { (*pmm_data).pLoadLibraryA };
+    let _GetProcAddress = unsafe { &(*pmm_data).pGetProcAddress };
+    let base_addr = pmm_data as *const u8;
+
+    println!("Hi from loader func");
 }
