@@ -17,7 +17,7 @@ use winapi::{
             IMAGE_DOS_HEADER, IMAGE_FILE_HEADER, IMAGE_NT_HEADERS, IMAGE_OPTIONAL_HEADER,
             IMAGE_REL_BASED_DIR64, IMAGE_REL_BASED_HIGHLOW, IMAGE_SECTION_HEADER, MEM_COMMIT,
             MEM_FREE, MEM_RESERVE, PAGE_EXECUTE_READWRITE, PIMAGE_NT_HEADERS,
-            PIMAGE_SECTION_HEADER, PROCESS_ALL_ACCESS,
+            PIMAGE_SECTION_HEADER, PROCESS_ALL_ACCESS, IMAGE_DIRECTORY_ENTRY_BASERELOC, IMAGE_BASE_RELOCATION,
         },
     },
 };
@@ -80,6 +80,24 @@ impl std::fmt::Display for SectionName {
     }
 }
 
+fn get_headers_from_dll<'a>(
+    p_data: *const u8,
+) -> (
+    &'a IMAGE_DOS_HEADER,
+    &'a IMAGE_NT_HEADERS,
+    &'a IMAGE_OPTIONAL_HEADER,
+    &'a IMAGE_FILE_HEADER,
+) {
+    let dos_header: &IMAGE_DOS_HEADER = unsafe { &*(p_data as *const IMAGE_DOS_HEADER) };
+    let nt_header = unsafe {
+        &*(p_data.add(dos_header.e_lfanew.try_into().unwrap()) as *const IMAGE_NT_HEADERS)
+    };
+    let optional_header = &nt_header.OptionalHeader;
+    let file_header = &nt_header.FileHeader;
+
+    return (dos_header, nt_header, optional_header, file_header);
+}
+
 pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
     let dll_data = utils::files::is_valid_dll(dll_path.clone());
     if !(dll_data.len() > 0) {
@@ -107,14 +125,8 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
         target_proc as usize
     );
 
-    let dos_header: &IMAGE_DOS_HEADER = unsafe { &*(dll_data.as_ptr() as *const IMAGE_DOS_HEADER) };
-    let nt_header = unsafe {
-        &*(dll_data
-            .as_ptr()
-            .add(dos_header.e_lfanew.try_into().unwrap()) as *const IMAGE_NT_HEADERS)
-    };
-    let optional_header = &nt_header.OptionalHeader;
-    let file_header = &nt_header.FileHeader;
+    let (dos_header, nt_header, optional_header, file_header) =
+        get_headers_from_dll(dll_data.as_ptr());
 
     println!(
         "Dll dos header in host process found at 0x{:x}",
@@ -306,4 +318,23 @@ extern "system" fn loader(pmm_data: *mut ManualMapLoaderData) {
     let _LoadLibraryA = unsafe { (*pmm_data).pLoadLibraryA };
     let _GetProcAddress = unsafe { &(*pmm_data).pGetProcAddress };
     let base_addr = pmm_data as *const u8;
+
+    let (dos_header, nt_header, optional_header, file_header) = get_headers_from_dll(base_addr);
+
+    let _DllMain: f_DllMain =
+        unsafe { std::mem::transmute(base_addr.add(optional_header.AddressOfEntryPoint as usize)) };
+
+    if base_addr as u64 - optional_header.ImageBase != 0 {
+        if optional_header.DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC as usize].Size == 0 {
+            return;
+        }
+
+        let preloc_data : *mut IMAGE_BASE_RELOCATION = unsafe {base_addr.add(optional_header.DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC as usize].VirtualAddress as usize)} as *mut IMAGE_BASE_RELOCATION;
+        let reloc_data = &unsafe{*preloc_data};
+
+        while reloc_data.VirtualAddress != 0 {
+            let number_of_entries = (reloc_data.SizeOfBlock as usize - std::mem::size_of::<IMAGE_BASE_RELOCATION>()) / std::mem::size_of::<WORD>();
+            
+        }
+    }
 }
