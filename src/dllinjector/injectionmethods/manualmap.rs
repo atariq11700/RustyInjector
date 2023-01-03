@@ -1,12 +1,10 @@
 use winapi::{
-    ctypes::c_void,
     shared::{
-        basetsd::{SIZE_T, ULONG_PTR},
+        basetsd::{SIZE_T, UINT_PTR, ULONG_PTR},
         minwindef::{BOOL, DWORD, FARPROC, HINSTANCE, HMODULE, LPCVOID, LPDWORD, LPVOID, WORD},
         ntdef::{HANDLE, LPCSTR},
     },
     um::{
-        consoleapi::AllocConsole,
         handleapi::{CloseHandle, INVALID_HANDLE_VALUE},
         libloaderapi::{GetProcAddress, LoadLibraryA},
         memoryapi::{VirtualAllocEx, VirtualFreeEx, WriteProcessMemory},
@@ -14,12 +12,16 @@ use winapi::{
         processthreadsapi::{CreateRemoteThreadEx, OpenProcess, LPPROC_THREAD_ATTRIBUTE_LIST},
         tlhelp32::PROCESSENTRY32,
         winnt::{
-            IMAGE_DOS_HEADER, IMAGE_FILE_HEADER, IMAGE_NT_HEADERS, IMAGE_OPTIONAL_HEADER,
-            IMAGE_REL_BASED_DIR64, IMAGE_REL_BASED_HIGHLOW, IMAGE_SECTION_HEADER, MEM_COMMIT,
-            MEM_FREE, MEM_RESERVE, PAGE_EXECUTE_READWRITE, PIMAGE_NT_HEADERS,
-            PIMAGE_SECTION_HEADER, PROCESS_ALL_ACCESS, IMAGE_DIRECTORY_ENTRY_BASERELOC, IMAGE_BASE_RELOCATION,
+            DLL_PROCESS_ATTACH, IMAGE_BASE_RELOCATION, IMAGE_DIRECTORY_ENTRY_BASERELOC,
+            IMAGE_DIRECTORY_ENTRY_IMPORT, IMAGE_DIRECTORY_ENTRY_TLS, IMAGE_DOS_HEADER,
+            IMAGE_FILE_HEADER, IMAGE_IMPORT_BY_NAME, IMAGE_IMPORT_DESCRIPTOR, IMAGE_NT_HEADERS,
+            IMAGE_OPTIONAL_HEADER, IMAGE_REL_BASED_DIR64, IMAGE_REL_BASED_HIGHLOW,
+            IMAGE_SECTION_HEADER, IMAGE_SNAP_BY_ORDINAL, IMAGE_TLS_DIRECTORY, MEM_COMMIT, MEM_FREE,
+            MEM_RESERVE, PAGE_EXECUTE_READWRITE, PIMAGE_NT_HEADERS, PIMAGE_SECTION_HEADER,
+            PIMAGE_TLS_CALLBACK, PROCESS_ALL_ACCESS, PVOID,
         },
     },
+    vc::vadefs::uintptr_t,
 };
 
 use crate::utils;
@@ -310,31 +312,120 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
     return true;
 }
 
-extern "system" fn loader(pmm_data: *mut ManualMapLoaderData) {
+unsafe extern "system" fn loader(pmm_data: *mut ManualMapLoaderData) {
     if pmm_data as usize == 0 {
         return;
     }
 
-    let _LoadLibraryA = unsafe { (*pmm_data).pLoadLibraryA };
-    let _GetProcAddress = unsafe { &(*pmm_data).pGetProcAddress };
+    let _LoadLibraryA = (*pmm_data).pLoadLibraryA;
+    let _GetProcAddress = &(*pmm_data).pGetProcAddress;
     let base_addr = pmm_data as *const u8;
 
-    let (dos_header, nt_header, optional_header, file_header) = get_headers_from_dll(base_addr);
+    let dos_header: &IMAGE_DOS_HEADER = &*(base_addr as *const IMAGE_DOS_HEADER);
+    let nt_header = &*(base_addr.add(dos_header.e_lfanew as usize) as *const IMAGE_NT_HEADERS);
+    let optional_header = &nt_header.OptionalHeader;
+    let file_header = &nt_header.FileHeader;
 
     let _DllMain: f_DllMain =
-        unsafe { std::mem::transmute(base_addr.add(optional_header.AddressOfEntryPoint as usize)) };
+        std::mem::transmute(base_addr.add(optional_header.AddressOfEntryPoint as usize));
 
-    if base_addr as u64 - optional_header.ImageBase != 0 {
+    let loc_delta = base_addr as u64 - optional_header.ImageBase;
+    if loc_delta != 0 {
         if optional_header.DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC as usize].Size == 0 {
             return;
         }
 
-        let preloc_data : *mut IMAGE_BASE_RELOCATION = unsafe {base_addr.add(optional_header.DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC as usize].VirtualAddress as usize)} as *mut IMAGE_BASE_RELOCATION;
-        let reloc_data = &unsafe{*preloc_data};
+        let mut preloc_data: *mut IMAGE_BASE_RELOCATION = base_addr.add(
+            optional_header.DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC as usize].VirtualAddress
+                as usize,
+        ) as *mut IMAGE_BASE_RELOCATION;
+        let reloc_data = &*preloc_data;
 
         while reloc_data.VirtualAddress != 0 {
-            let number_of_entries = (reloc_data.SizeOfBlock as usize - std::mem::size_of::<IMAGE_BASE_RELOCATION>()) / std::mem::size_of::<WORD>();
-            
+            let number_of_entries = (reloc_data.SizeOfBlock as usize
+                - std::mem::size_of::<IMAGE_BASE_RELOCATION>())
+                / std::mem::size_of::<WORD>();
+            let mut prelative_info = preloc_data.add(1) as *const WORD;
+
+            for i in 0..number_of_entries {
+                #[cfg(target_pointer_width = "64")]
+                if (*prelative_info >> 0x0C) == IMAGE_REL_BASED_DIR64 {
+                    let pPatch = base_addr
+                        .add(reloc_data.VirtualAddress as usize)
+                        .add((*prelative_info & 0xFFF) as usize)
+                        as *mut uintptr_t;
+                    *pPatch += loc_delta as usize;
+                }
+
+                #[cfg(target_pointer_width = "32")]
+                if (*prelative_info >> 0x0C) == IMAGE_REL_BASED_HIGHLOW {
+                    let pPatch = base_addr
+                        .add(reloc_data.VirtualAddress as usize)
+                        .add((*prelative_info & 0xFFF) as usize)
+                        as *mut uintptr_t;
+                    *pPatch += loc_delta as usize;
+                }
+                prelative_info = prelative_info.add(1);
+            }
+
+            preloc_data = (preloc_data as *mut u8).add(reloc_data.SizeOfBlock as usize)
+                as *mut IMAGE_BASE_RELOCATION;
         }
     }
+
+    if optional_header.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT as usize].Size != 0 {
+        let mut pimport_desc = base_addr.add(
+            optional_header.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT as usize].VirtualAddress
+                as usize,
+        ) as *const IMAGE_IMPORT_DESCRIPTOR;
+        let mut import_desc = &*pimport_desc;
+
+        while import_desc.Name != 0 {
+            let szModule = base_addr.add(import_desc.Name as usize) as *const i8;
+
+            //! Crash here
+            let loaded_module = _LoadLibraryA(szModule);
+
+            //     let mut pThunk =
+            //         base_addr.add(*import_desc.u.OriginalFirstThunk() as usize) as *mut uintptr_t;
+
+            //     let mut pFunc = base_addr.add(import_desc.FirstThunk as usize) as *mut uintptr_t;
+
+            //     if pThunk as usize != 0 {
+            //         pThunk = pFunc;
+            //     }
+
+            //     while *pThunk != 0 {
+            //         if IMAGE_SNAP_BY_ORDINAL(*pThunk as u64) {
+            //             *pFunc =
+            //                 _GetProcAddress(loaded_module, (*pThunk & 0xFFFF) as *const i8) as usize;
+            //         } else {
+            //             let import_name = base_addr.add(*pThunk) as *const IMAGE_IMPORT_BY_NAME;
+            //             *pFunc =
+            //                 _GetProcAddress(loaded_module, &(*import_name).Name[0] as LPCSTR) as usize;
+            //         }
+            //         pThunk = pThunk.add(1);
+            //         pFunc = pFunc.add(1);
+            //     }
+            pimport_desc = pimport_desc.add(1);
+            import_desc = &*pimport_desc;
+        }
+    }
+
+    // if optional_header.DataDirectory[IMAGE_DIRECTORY_ENTRY_TLS as usize].Size != 0 {
+    //     let pTls_dir = base_addr.add(
+    //         optional_header.DataDirectory[IMAGE_DIRECTORY_ENTRY_TLS as usize].VirtualAddress
+    //             as usize,
+    //     ) as *const IMAGE_TLS_DIRECTORY;
+
+    //     let pTls_callback = (*pTls_dir).AddressOfCallBacks as *const PIMAGE_TLS_CALLBACK;
+
+    //     while pTls_callback as usize != 0
+    //         && (*pTls_callback).unwrap_or(std::mem::transmute(0 as u64)) as usize != 0
+    //     {
+    //         (*pTls_callback).unwrap()(base_addr as PVOID, DLL_PROCESS_ATTACH, 0 as PVOID)
+    //     }
+    // }
+
+    // _DllMain(base_addr as HMODULE, DLL_PROCESS_ATTACH, 0 as PVOID);
 }
