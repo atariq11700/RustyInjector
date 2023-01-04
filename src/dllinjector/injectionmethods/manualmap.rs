@@ -6,7 +6,7 @@ use winapi::{
     },
     um::{
         handleapi::{CloseHandle, INVALID_HANDLE_VALUE},
-        libloaderapi::{GetProcAddress, LoadLibraryA},
+        libloaderapi::{GetModuleHandleA, GetProcAddress, LoadLibraryA},
         memoryapi::{VirtualAllocEx, VirtualFreeEx, WriteProcessMemory},
         minwinbase::LPSECURITY_ATTRIBUTES,
         processthreadsapi::{CreateRemoteThreadEx, OpenProcess, LPPROC_THREAD_ATTRIBUTE_LIST},
@@ -15,15 +15,15 @@ use winapi::{
             DLL_PROCESS_ATTACH, IMAGE_BASE_RELOCATION, IMAGE_DIRECTORY_ENTRY_BASERELOC,
             IMAGE_DIRECTORY_ENTRY_IMPORT, IMAGE_DIRECTORY_ENTRY_TLS, IMAGE_DOS_HEADER,
             IMAGE_FILE_HEADER, IMAGE_IMPORT_BY_NAME, IMAGE_IMPORT_DESCRIPTOR, IMAGE_NT_HEADERS,
-            IMAGE_OPTIONAL_HEADER, IMAGE_REL_BASED_DIR64, IMAGE_REL_BASED_HIGHLOW,
-            IMAGE_SECTION_HEADER, IMAGE_SNAP_BY_ORDINAL, IMAGE_TLS_DIRECTORY, MEM_COMMIT, MEM_FREE,
-            MEM_RESERVE, PAGE_EXECUTE_READWRITE, PIMAGE_NT_HEADERS, PIMAGE_SECTION_HEADER,
-            PIMAGE_TLS_CALLBACK, PROCESS_ALL_ACCESS, PVOID,
+            IMAGE_OPTIONAL_HEADER, IMAGE_ORDINAL_FLAG32, IMAGE_ORDINAL_FLAG64,
+            IMAGE_REL_BASED_DIR64, IMAGE_REL_BASED_HIGHLOW, IMAGE_SECTION_HEADER,
+            IMAGE_SNAP_BY_ORDINAL, IMAGE_TLS_DIRECTORY, MEM_COMMIT, MEM_FREE, MEM_RESERVE,
+            PAGE_EXECUTE_READWRITE, PIMAGE_NT_HEADERS, PIMAGE_SECTION_HEADER, PIMAGE_TLS_CALLBACK,
+            PROCESS_ALL_ACCESS, PVOID,
         },
     },
     vc::vadefs::uintptr_t,
 };
-
 use crate::utils;
 
 type f_LoadLibraryA = unsafe extern "system" fn(lpLibraryFilename: LPCSTR) -> HINSTANCE;
@@ -38,14 +38,6 @@ struct ManualMapLoaderData {
     pLoadLibraryA: f_LoadLibraryA,
     pGetProcAddress: f_GetProcAddress,
     pDllBaseAddr: HINSTANCE,
-}
-
-fn needs_reloc(reloc_info: WORD) -> bool {
-    #[cfg(target_pointer_width = "64")]
-    return (reloc_info >> 0x0C) == IMAGE_REL_BASED_DIR64;
-
-    #[cfg(target_pointer_width = "32")]
-    return (reloc_info >> 0x0C) == IMAGE_REL_BASED_HIGHLOW;
 }
 
 fn image_first_section(pnt_header: PIMAGE_NT_HEADERS) -> PIMAGE_SECTION_HEADER {
@@ -241,9 +233,20 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
     }
     println!("Wrote pe headers to target process");
 
+    let kernel32 = unsafe { GetModuleHandleA("kernel32.dll\0".as_ptr() as LPCSTR) };
     let mm_data = ManualMapLoaderData {
-        pLoadLibraryA: LoadLibraryA,
-        pGetProcAddress: GetProcAddress,
+        pLoadLibraryA: unsafe {
+            std::mem::transmute(GetProcAddress(
+                kernel32,
+                "LoadLibraryA\0".as_ptr() as LPCSTR,
+            ))
+        },
+        pGetProcAddress: unsafe {
+            std::mem::transmute(GetProcAddress(
+                kernel32,
+                "GetProcAddress\0".as_ptr() as LPCSTR,
+            ))
+        },
         pDllBaseAddr: base_addr_ex as HINSTANCE,
     };
 
@@ -383,30 +386,42 @@ unsafe extern "system" fn loader(pmm_data: *mut ManualMapLoaderData) {
         while import_desc.Name != 0 {
             let szModule = base_addr.add(import_desc.Name as usize) as *const i8;
 
-            //! Crash here
             let loaded_module = _LoadLibraryA(szModule);
 
-            //     let mut pThunk =
-            //         base_addr.add(*import_desc.u.OriginalFirstThunk() as usize) as *mut uintptr_t;
+            //crash here
+            let mut pThunk =
+                base_addr.add(*import_desc.u.OriginalFirstThunk() as usize) as *mut uintptr_t;
 
-            //     let mut pFunc = base_addr.add(import_desc.FirstThunk as usize) as *mut uintptr_t;
+            // let mut pFunc = base_addr.add(import_desc.FirstThunk as usize) as *mut uintptr_t;
 
-            //     if pThunk as usize != 0 {
-            //         pThunk = pFunc;
+            // if pThunk as usize != 0 {
+            //     pThunk = pFunc;
+            // }
+
+            // while *pThunk != 0 {
+            //     #[cfg(target_pointer_width = "64")]
+            //     if ((*pThunk as u64) & IMAGE_ORDINAL_FLAG64) != 0 {
+            //         *pFunc =
+            //             _GetProcAddress(loaded_module, (*pThunk & 0xFFFF) as *const i8) as usize;
+            //     } else {
+            //         let import_name = base_addr.add(*pThunk) as *const IMAGE_IMPORT_BY_NAME;
+            //         *pFunc =
+            //             _GetProcAddress(loaded_module, &(*import_name).Name[0] as LPCSTR) as usize;
             //     }
 
-            //     while *pThunk != 0 {
-            //         if IMAGE_SNAP_BY_ORDINAL(*pThunk as u64) {
-            //             *pFunc =
-            //                 _GetProcAddress(loaded_module, (*pThunk & 0xFFFF) as *const i8) as usize;
-            //         } else {
-            //             let import_name = base_addr.add(*pThunk) as *const IMAGE_IMPORT_BY_NAME;
-            //             *pFunc =
-            //                 _GetProcAddress(loaded_module, &(*import_name).Name[0] as LPCSTR) as usize;
-            //         }
-            //         pThunk = pThunk.add(1);
-            //         pFunc = pFunc.add(1);
+            //     #[cfg(target_pointer_width = "32")]
+            //     if ((*pThunk as u64) & IMAGE_ORDINAL_FLAG32) != 0 {
+            //         *pFunc =
+            //             _GetProcAddress(loaded_module, (*pThunk & 0xFFFF) as *const i8) as usize;
+            //     } else {
+            //         let import_name = base_addr.add(*pThunk) as *const IMAGE_IMPORT_BY_NAME;
+            //         *pFunc =
+            //             _GetProcAddress(loaded_module, &(*import_name).Name[0] as LPCSTR) as usize;
             //     }
+
+            //     pThunk = pThunk.add(1);
+            //     pFunc = pFunc.add(1);
+            // }
             pimport_desc = pimport_desc.add(1);
             import_desc = &*pimport_desc;
         }
