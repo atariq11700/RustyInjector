@@ -389,7 +389,6 @@ unsafe extern "system" fn loader(pmm_data: *mut ManualMapLoaderData) {
 
             let loaded_module = _LoadLibraryA(szModule);
 
-            //crash here
             let originalFirstThunk =
                 unsafe { *(&import_desc.u as *const IMAGE_IMPORT_DESCRIPTOR_u as *const usize) };
             let mut pThunk = base_addr.add(originalFirstThunk) as *mut uintptr_t;
