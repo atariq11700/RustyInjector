@@ -26,6 +26,7 @@ use winapi::{
     vc::vadefs::uintptr_t,
 };
 
+//function pointer types
 type f_LoadLibraryA = unsafe extern "system" fn(lpLibraryFilename: LPCSTR) -> HINSTANCE;
 type f_GetProcAddress = unsafe extern "system" fn(hModule: HMODULE, lpProcName: LPCSTR) -> FARPROC;
 type f_DllMain = unsafe extern "system" fn(
@@ -33,14 +34,15 @@ type f_DllMain = unsafe extern "system" fn(
     dw_reason_for_call: DWORD,
     lpReserved: LPVOID,
 ) -> BOOL;
-type f_printf = unsafe extern "cdecl" fn(format: LPCSTR, ...);
 
+///Data struct to be populated and passed to the loader function inside target process
 struct ManualMapLoaderData {
     pLoadLibraryA: f_LoadLibraryA,
     pGetProcAddress: f_GetProcAddress,
     pDllBaseAddr: HINSTANCE,
 }
 
+/// rust implementation of the cpp IMAGE_FIRST_SECTION macro
 fn image_first_section(pnt_header: PIMAGE_NT_HEADERS) -> PIMAGE_SECTION_HEADER {
     let base = (pnt_header as ULONG_PTR);
     let off1 = memoffset::offset_of!(IMAGE_NT_HEADERS, OptionalHeader);
@@ -50,6 +52,11 @@ fn image_first_section(pnt_header: PIMAGE_NT_HEADERS) -> PIMAGE_SECTION_HEADER {
     return (base + off1 + off2) as PIMAGE_SECTION_HEADER;
 }
 
+///wrapper for the pe image section names so that they can be printed nicely
+//.text
+//.rdata
+//.bss
+//etc...
 struct SectionName {
     bytes: [u8; 8],
 }
@@ -60,21 +67,19 @@ impl SectionName {
 }
 impl std::fmt::Display for SectionName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}{}{}{}{}{}{}{}",
-            self.bytes[0] as char,
-            self.bytes[1] as char,
-            self.bytes[2] as char,
-            self.bytes[3] as char,
-            self.bytes[4] as char,
-            self.bytes[5] as char,
-            self.bytes[6] as char,
-            self.bytes[7] as char
-        )
+        for i in 0..8 {
+            match write!(f, "{}", self.bytes[i] as char) {
+                Ok(_) => {}
+                Err(err) => {
+                    println!("Error printing section name {err}")
+                }
+            }
+        }
+        Ok(())
     }
 }
 
+///takes a windows dll as a *const u8 to the bytes and returns refernces to the DOS, NT, OPTIONAL, and FILE headers
 fn get_headers_from_dll<'a>(
     p_data: *const u8,
 ) -> (
@@ -93,7 +98,11 @@ fn get_headers_from_dll<'a>(
     return (dos_header, nt_header, optional_header, file_header);
 }
 
+///Manual Map injection function
+/// 
+/// Reads in and validates the dll. Then opens the target process and allocates/writes the dll sections, the dll pe headers, the loader function, and the data for the loader function. It then creates a remote thread calling the loader function
 pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
+    //read in and validate dll
     let dll_data = utils::files::is_valid_dll(dll_path.clone());
     if !(dll_data.len() > 0) {
         println!("Unable to read dll");
@@ -105,6 +114,7 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
         dll_data.as_ptr() as usize
     );
 
+    //open target process
     let target_proc: HANDLE =
         unsafe { OpenProcess(PROCESS_ALL_ACCESS, false as BOOL, proc.th32ProcessID) };
 
@@ -120,6 +130,7 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
         target_proc as usize
     );
 
+    //get the dll headers
     let (dos_header, nt_header, optional_header, file_header) =
         get_headers_from_dll(dll_data.as_ptr());
 
@@ -141,6 +152,7 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
         file_header as *const IMAGE_FILE_HEADER as usize
     );
 
+    //allocate enough memory inside the target process for the dll sections/code
     let mut base_addr_ex = unsafe {
         VirtualAllocEx(
             target_proc,
@@ -175,6 +187,7 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
     let mut psection_header =
         image_first_section(nt_header as *const IMAGE_NT_HEADERS as PIMAGE_NT_HEADERS);
 
+    //Write the dll sections to the target process
     for _ in 0..file_header.NumberOfSections {
         unsafe {
             let section_header = &*psection_header;
@@ -183,6 +196,7 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
                 SectionName::from(section_header.Name),
                 psection_header as usize
             );
+            //write the section so long as it has a size > 0
             if section_header.SizeOfRawData > 0 {
                 let name = section_header.Name;
                 if WriteProcessMemory(
@@ -220,6 +234,8 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
         }
     }
 
+    //write the first 0x1000 bytes of the pe headers to the target process
+    //would be better to calculate the actual size
     if unsafe {
         WriteProcessMemory(
             target_proc,
@@ -234,6 +250,8 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
     }
     println!("Wrote pe headers to target process");
 
+    //setup the loader data
+    //get functions pointers to LoadLibraryA and GetProcAddress. The function pointers need to point to the functions withing kernel32.dll so use GetProcAddress to get the correct addresss
     let kernel32 = unsafe { GetModuleHandleA("kernel32.dll\0".as_ptr() as LPCSTR) };
     let mm_data = ManualMapLoaderData {
         pLoadLibraryA: unsafe {
@@ -251,6 +269,7 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
         pDllBaseAddr: base_addr_ex as HINSTANCE,
     };
 
+    //write the loader data
     if unsafe {
         WriteProcessMemory(
             target_proc,
@@ -265,6 +284,7 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
     }
     println!("Wrote loader data to target process");
 
+    //allocate 0x1000 bytes for the loader function within the target process
     let loader_addr = unsafe {
         VirtualAllocEx(
             target_proc,
@@ -282,6 +302,7 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
         loader_addr as usize
     );
 
+    //write the loader function to the target process
     if unsafe {
         WriteProcessMemory(
             target_proc,
@@ -296,6 +317,7 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
     }
     println!("Wrote loader function to the target process");
 
+    //create a remote thread withing the target process and call the loader function
     if unsafe {
         CreateRemoteThreadEx(
             target_proc,
@@ -317,14 +339,18 @@ pub fn inject(proc: PROCESSENTRY32, dll_path: String) -> bool {
 }
 
 unsafe extern "system" fn loader(pmm_data: *mut ManualMapLoaderData) {
+    //make sure the base address and data is a valid pointer
     if pmm_data as usize == 0 {
         return;
     }
 
+    //turn the function pointers back into functions for use later
     let _LoadLibraryA = (*pmm_data).pLoadLibraryA;
     let _GetProcAddress = &(*pmm_data).pGetProcAddress;
     let base_addr = pmm_data as *const u8;
 
+
+    //get the dll headers again
     let dos_header: &IMAGE_DOS_HEADER = &*(base_addr as *const IMAGE_DOS_HEADER);
     let nt_header = &*(base_addr.add(dos_header.e_lfanew as usize) as *const IMAGE_NT_HEADERS);
     let optional_header = &nt_header.OptionalHeader;
@@ -333,8 +359,11 @@ unsafe extern "system" fn loader(pmm_data: *mut ManualMapLoaderData) {
     let _DllMain: f_DllMain =
         std::mem::transmute(base_addr.add(optional_header.AddressOfEntryPoint as usize));
 
+
+    //perform relocations if necessary
     let loc_delta = base_addr as u64 - optional_header.ImageBase;
     if loc_delta != 0 {
+        //make sure the dll has a valid relocation section
         if optional_header.DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC as usize].Size == 0 {
             return;
         }
@@ -377,6 +406,8 @@ unsafe extern "system" fn loader(pmm_data: *mut ManualMapLoaderData) {
         }
     }
 
+
+    //check the IAT for imports
     if optional_header.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT as usize].Size != 0 {
         let mut pimport_desc = base_addr.add(
             optional_header.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT as usize].VirtualAddress
@@ -384,13 +415,14 @@ unsafe extern "system" fn loader(pmm_data: *mut ManualMapLoaderData) {
         ) as *const IMAGE_IMPORT_DESCRIPTOR;
         let mut import_desc = &*pimport_desc;
 
+        //import the functions and modules if they are in the IAT
         while import_desc.Name != 0 {
             let szModule = base_addr.add(import_desc.Name as usize) as *const i8;
 
             let loaded_module = _LoadLibraryA(szModule);
 
             let originalFirstThunk =
-                 *(&import_desc.u as *const IMAGE_IMPORT_DESCRIPTOR_u as *const usize) ;
+                *(&import_desc.u as *const IMAGE_IMPORT_DESCRIPTOR_u as *const usize);
             let mut pThunk = base_addr.add(originalFirstThunk) as *mut uintptr_t;
 
             let mut pFunc = base_addr.add(import_desc.FirstThunk as usize) as *mut uintptr_t;
@@ -428,6 +460,7 @@ unsafe extern "system" fn loader(pmm_data: *mut ManualMapLoaderData) {
         }
     }
 
+    //call the necessary TLS callbacks
     if optional_header.DataDirectory[IMAGE_DIRECTORY_ENTRY_TLS as usize].Size != 0 {
         let pTls_dir = base_addr.add(
             optional_header.DataDirectory[IMAGE_DIRECTORY_ENTRY_TLS as usize].VirtualAddress
@@ -436,8 +469,7 @@ unsafe extern "system" fn loader(pmm_data: *mut ManualMapLoaderData) {
 
         let mut pTls_callback = (*pTls_dir).AddressOfCallBacks as *const PIMAGE_TLS_CALLBACK;
 
-        while pTls_callback as usize != 0
-        {
+        while pTls_callback as usize != 0 {
             match *pTls_callback {
                 Some(callback) => callback(base_addr as PVOID, DLL_PROCESS_ATTACH, 0 as PVOID),
                 None => break,
@@ -446,5 +478,6 @@ unsafe extern "system" fn loader(pmm_data: *mut ManualMapLoaderData) {
         }
     }
 
+    //call the dll main
     _DllMain(base_addr as HMODULE, DLL_PROCESS_ATTACH, 0 as PVOID);
 }
