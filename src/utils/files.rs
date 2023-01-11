@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 use std::{io::Read, mem::size_of};
 
 use std::fs;
@@ -76,6 +75,7 @@ pub fn is_valid_dll(dll_path: String) -> Vec<u8> {
     return file_contents;
 }
 
+#[allow(dead_code)]
 pub fn load_icon(path: &str) -> eframe::IconData {
     let (icon_rgba, icon_width, icon_height) = {
         let image = image::open(path)
