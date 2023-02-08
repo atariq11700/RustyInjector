@@ -1,3 +1,4 @@
+#![allow(non_snake_case)]
 fn main() {
     for i in 0.. {
         println!("Count: {i}");
